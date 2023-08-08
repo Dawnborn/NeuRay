@@ -979,6 +979,13 @@ class DTUTrainDatabase(BaseDatabase):
     def get_depth_range(self,img_id):
         return self.range_dict[img_id].copy()
 
+class TransCGTestDatabase(Basedatabase):
+    def __init__(self, database_name):
+    '''
+    database_name: should be like transcg/scene1/
+    '''
+        database_name = database_name.split('/')
+
 
 def parse_database_name(database_name:str)->BaseDatabase:
     name2database={
@@ -995,6 +1002,7 @@ def parse_database_name(database_name:str)->BaseDatabase:
         'llff_colmap': LLFFColmapDatabase,
         'blended_mvs': BlendedMVSDatabase,
         'example': ExampleDatabase,
+        'transcg_test':TransCGTestDatabase,
     }
     database_type = database_name.split('/')[0]
     if database_type in name2database:

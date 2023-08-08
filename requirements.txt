@@ -1,5 +1,5 @@
-pytorch>=1.4.0
-tensorflow>=2.0
+# pytorch>=1.4.0
+# tensorflow>=2.0
 easydict
 inplace-abn
 plyfile
@@ -14,3 +14,11 @@ scipy
 lpips
 transforms3d
 tensorboardX
+kornia
+catkin_pkg
+black
+pandas
+mpi4py
+open3d
+pybullet==2.7.9
+pytorch-ignite

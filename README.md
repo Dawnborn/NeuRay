@@ -53,9 +53,7 @@ python render.py --cfg configs/gen/neuray_gen_depth.yaml \
                  --pose_type eval                 
 
 # render on snowman of the DTU dataset
-python render.py --cfg configs/gen/neuray_gen_depth.yaml \  
-                 --database dtu_test/snowman/black_800 \ # dtu_test/snowman/black_400
-                 --pose_type eval 
+python render.py --cfg configs/gen/neuray_gen_depth.yaml --database dtu_test/snowman/black_800 --pose_type eval 
                  
 # render on fern of the LLFF dataset
 python render.py --cfg configs/gen/neuray_gen_depth.yaml \
