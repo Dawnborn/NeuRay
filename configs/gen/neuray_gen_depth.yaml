@@ -7,7 +7,8 @@ use_hierarchical_sampling: true
 use_depth_loss: true
 dist_decoder_cfg:
   use_vis: false
-ray_batch_num: 8192
+# ray_batch_num: 8192
+ray_batch_num: 2048
 
 # loss
 loss: [render, depth]

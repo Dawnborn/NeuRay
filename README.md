@@ -48,9 +48,7 @@ NeuRay
 ### Render
 ```shell
 # render on lego of the NeRF synthetic dataset
-python render.py --cfg configs/gen/neuray_gen_depth.yaml \  
-                 --database nerf_synthetic/lego/black_800 \ # nerf_synthetic/lego/black_400
-                 --pose_type eval                 
+python render.py --cfg configs/gen/neuray_gen_depth.yaml --database nerf_synthetic/lego/black_800 --pose_type eval
 
 # render on snowman of the DTU dataset
 python render.py --cfg configs/gen/neuray_gen_depth.yaml \  
