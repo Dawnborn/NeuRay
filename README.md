@@ -1,3 +1,12 @@
+# Envs
+AG PC: 
+```
+conda activate neuray37cu111
+source prep_cuda.sh
+```
+
+---
+---
 # NeuRay
 
 Rendered video without training on the scene.

@@ -271,6 +271,9 @@ class NeRFSyntheticDatabase(BaseDatabase):
         self.depth_img_ids = [img_id for img_id in self.img_ids if self._depth_existence(img_id)]
 
     def parse_info(self,split='train'):
+        '''
+        read in RUB formatc2w, change it to a self defined way
+        '''
         with open(f'{self.root_dir}/transforms_{split}.json','r') as f:
             img_info=json.load(f)
             focal=float(img_info['camera_angle_x'])
