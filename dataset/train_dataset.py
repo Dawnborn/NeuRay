@@ -60,7 +60,7 @@ def build_src_imgs_info_select(database, ref_ids, ref_ids_all, cost_volume_nn_nu
     ref_cv_idx = ref_cv_idx[np.argsort(ref_cv_idx_)]  # sort
     ref_cv_idx = ref_cv_idx.reshape([rfn, nn])
     is_aligned = not database.database_name.startswith('space')
-    ref_imgs_info = build_imgs_info(database, ref_ids_in, pad_interval, is_aligned)
+    ref_imgs_info = build_imgs_info(database, ref_ids_in, pad_interval, is_aligned, has_depth=False)
     return ref_imgs_info, ref_cv_idx, ref_real_idx
 
 class GeneralRendererDataset(Dataset):

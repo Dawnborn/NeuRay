@@ -57,24 +57,33 @@ def random_flip(ref_imgs_info,que_imgs_info):
     que_imgs_info = flip_imgs_info(que_imgs_info)
     return ref_imgs_info, que_imgs_info
 
-def pad_imgs_info(ref_imgs_info,pad_interval):
-    ref_imgs, ref_depths, ref_masks = ref_imgs_info['imgs'], ref_imgs_info['depth'], ref_imgs_info['masks']
+def pad_imgs_info(ref_imgs_info,pad_interval, has_depth = True):
+    ref_imgs, ref_masks = ref_imgs_info['imgs'], ref_imgs_info['masks']
+    if has_depth:
+        ref_depths = ref_imgs_info['depth']
     ref_depth_gt = ref_imgs_info['true_depth'] if 'true_depth' in ref_imgs_info else None
     rfn, _, h, w = ref_imgs.shape
     ph = (pad_interval - (h % pad_interval)) % pad_interval
     pw = (pad_interval - (w % pad_interval)) % pad_interval
     if ph != 0 or pw != 0:
         ref_imgs = np.pad(ref_imgs, ((0, 0), (0, 0), (0, ph), (0, pw)), 'reflect')
-        ref_depths = np.pad(ref_depths, ((0, 0), (0, 0), (0, ph), (0, pw)), 'reflect')
+        if has_depth:
+            ref_depths = np.pad(ref_depths, ((0, 0), (0, 0), (0, ph), (0, pw)), 'reflect')
         ref_masks = np.pad(ref_masks, ((0, 0), (0, 0), (0, ph), (0, pw)), 'reflect')
         if ref_depth_gt is not None:
             ref_depth_gt = np.pad(ref_depth_gt, ((0, 0), (0, 0), (0, ph), (0, pw)), 'reflect')
-    ref_imgs_info['imgs'], ref_imgs_info['depth'], ref_imgs_info['masks'] = ref_imgs, ref_depths, ref_masks
+    ref_imgs_info['imgs'], ref_imgs_info['masks'] = ref_imgs, ref_masks
+    if has_depth:
+        ref_imgs_info['depth'] = ref_depths
     if ref_depth_gt is not None:
         ref_imgs_info['true_depth'] = ref_depth_gt
     return ref_imgs_info
 
 def build_imgs_info(database, ref_ids, pad_interval=-1, is_aligned=True, align_depth_range=False, has_depth=True, replace_none_depth = False):
+    '''
+    has_depth: if the dataset contains depth. Processing the depth image if necessary
+    replace_none_depth: if set true, none depth will be replaced the 0
+    '''
     if not is_aligned:
         assert has_depth
         rfn = len(ref_ids)
@@ -116,7 +125,7 @@ def build_imgs_info(database, ref_ids, pad_interval=-1, is_aligned=True, align_d
     ref_imgs_info = {'imgs': ref_imgs, 'poses': ref_poses, 'Ks': ref_Ks, 'depth_range': ref_depth_range, 'masks': ref_masks}
     if has_depth: ref_imgs_info['depth'] = ref_depths
     if pad_interval!=-1:
-        ref_imgs_info = pad_imgs_info(ref_imgs_info, pad_interval)
+        ref_imgs_info = pad_imgs_info(ref_imgs_info, pad_interval, has_depth)
     return ref_imgs_info
 
 def build_render_imgs_info(que_pose,que_K,que_shape,que_depth_range):

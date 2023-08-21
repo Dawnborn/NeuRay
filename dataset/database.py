@@ -268,7 +268,8 @@ class NeRFSyntheticDatabase(BaseDatabase):
         self.range_dict={img_id:np.asarray((2.0,6.0),np.float32) for img_id in self.img_ids}
         ratio = int(size) / 800
         self.K = np.diag([ratio,ratio,1.0]).astype(np.float32) @ K
-        self.depth_img_ids = [img_id for img_id in self.img_ids if self._depth_existence(img_id)]
+        # self.depth_img_ids = [img_id for img_id in self.img_ids if self._depth_existence(img_id)] # junpeng: orig
+        self.depth_img_ids = [img_id for img_id in self.img_ids]   # junpeng: new, keep
 
     def parse_info(self,split='train'):
         '''

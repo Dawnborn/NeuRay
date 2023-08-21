@@ -19,12 +19,15 @@ def prepare_render_info(database, pose_type, pose_fn, use_depth):
     # interpolate poses
     if pose_type.startswith('eval'):
         split_name = 'test' if use_depth else 'test_all'
-        ref_ids, render_ids = get_database_split(database, split_name)
+        # database: [nerf_synthetic, dtu_test, llff_colmap]
+        ref_ids, render_ids = get_database_split(database, split_name) # train_ids, val_ids
+        # load the intrinsics, poses, shapes, depth range from the dataset
         que_Ks = np.asarray([database.get_K(render_id) for render_id in render_ids],np.float32)
         que_poses = np.asarray([database.get_pose(render_id) for render_id in render_ids],np.float32)
         que_shapes = np.asarray([database.get_image(render_id).shape[:2] for render_id in render_ids],np.int64)
         que_depth_ranges = np.asarray([database.get_depth_range(render_id) for render_id in render_ids],np.float32)
     else:
+        # if not under evaluation, we interpolate the poses from the database
         que_poses = get_render_poses(database, pose_type, pose_fn)
 
         # prepare intrinsics, shape, depth range
@@ -67,7 +70,8 @@ def save_depth(output_dir, qi, render_info, h, w, depth_range):
 
 def render_video_gen(database_name: str,
                      cfg_fn='configs/gen_lr_neuray.yaml',
-                     pose_type='inter', pose_fn=None,
+                     pose_type='inter',
+                     pose_fn=None,
                      render_depth=False,
                      ray_num=8192, rb=0, re=-1):
     default_render_cfg = {
@@ -83,11 +87,11 @@ def render_video_gen(database_name: str,
     cfg['ray_batch_num'] = ray_num
     render_cfg = cfg['train_dataset_cfg'] if 'train_dataset_cfg' in cfg else {}
 
-    render_cfg = {**default_render_cfg, **render_cfg}
+    render_cfg = {**default_render_cfg, **render_cfg} ## merge two dictionary, overlapping keys use the later value
 
-    cfg['render_depth'] = render_depth
+    cfg['render_depth'] = render_depth ## render depth image or not
     # load model
-    renderer = name2network[cfg['network']](cfg)
+    renderer = name2network[cfg['network']](cfg) ## neuray_gen / neuray_ft
     ckpt = torch.load(f'data/model/{cfg["name"]}/model_best.pth')
     renderer.load_state_dict(ckpt['network_state_dict'])
     renderer.cuda()
@@ -95,7 +99,7 @@ def render_video_gen(database_name: str,
     step = ckpt["step"]
 
     # render poses
-    database = parse_database_name(database_name)
+    database = parse_database_name(database_name) ## NeRFSyntheticDatabase
     que_poses, que_Ks, que_shapes, que_depth_ranges, ref_ids_all, render_ids = \
         prepare_render_info(database, pose_type, pose_fn, render_cfg['use_depth'])
 
@@ -195,15 +199,15 @@ def render_video_ft(database_name, cfg_fn, pose_type, pose_fn, render_depth=Fals
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--database_name', type=str, default='llff_colmap/fern/high', help='<dataset_name>/<scene_name>/<scene_setting>')
-    parser.add_argument('--cfg', type=str, default='configs/gen_lr_neuray.yaml', help='config path of the renderer')
+    parser.add_argument('--database_name', type=str, default='nerf_synthetic/glass/black_800', help='<dataset_name>/<scene_name>/<scene_setting>')
+    parser.add_argument('--cfg', type=str, default='/data/hdd1/storage/junpeng/ws_neuray/NeuRay/configs/gen/neuray_gen_cost_volume.yaml', help='config path of the renderer')
     parser.add_argument('--pose_type', type=str, default='eval', help='type of render poses')
     parser.add_argument('--pose_fn', type=str, default=None, help='file to render poses')
     parser.add_argument('--rb', type=int, default=0, help='begin index of rendering poses')
     parser.add_argument('--re', type=int, default=-1, help='end index of rendering poses')
     parser.add_argument('--render_type', type=str, default='gen', help='gen:generalization or ft:finetuning')
     parser.add_argument('--ray_num', type=int, default=4096, help='number of rays in one rendering batch')
-    parser.add_argument('--depth', action='store_true', dest='depth', default=False)
+    parser.add_argument('--depth', action='store_true', dest='depth', default=True) # if set true, we will render depth image
     # parser.add_argument('--overlap', action='store_true', dest='overlap', default=False)
     flags = parser.parse_args()
     if flags.render_type=='gen':
