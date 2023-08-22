@@ -246,12 +246,12 @@ class CostVolumeInitNet(nn.Module):
 
     def forward(self, ref_imgs_info, src_imgs_info, is_train):
         cost_reg, depth = construct_cost_volume_with_src(ref_imgs_info, src_imgs_info, self.mvsnet, self.cfg['cost_volume_sn'], self.imagenet_mean, self.imagenet_std, is_train)
-        ref_feats = self.res_net(ref_imgs_info['imgs'])
-        volume_feats = self.volume_conv2d(cost_reg)
-        depth = extract_depth_for_init_impl(ref_imgs_info['depth_range'],depth.unsqueeze(1))
-        depth_feats = self.depth_conv(depth)
-        volume_feats = torch.cat([volume_feats, depth_feats],1)
-        return self.out_conv(torch.cat([ref_feats, volume_feats], 1))
+        ref_feats = self.res_net(ref_imgs_info['imgs']) #junpeng: 8,32,200,200
+        volume_feats = self.volume_conv2d(cost_reg) #junpeng: 8,32,200,200
+        depth = extract_depth_for_init_impl(ref_imgs_info['depth_range'],depth.unsqueeze(1)) #junpeng: 8, 1, 200, 200
+        depth_feats = self.depth_conv(depth) #junpeng: 8,32,200,200
+        volume_feats = torch.cat([volume_feats, depth_feats],1) #junpeng: 8 64 200 200
+        return self.out_conv(torch.cat([ref_feats, volume_feats], 1)) #
 
 name2init_net={
     'depth': DepthInitNet,

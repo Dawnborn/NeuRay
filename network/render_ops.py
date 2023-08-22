@@ -149,6 +149,9 @@ def sample_depth(depth_range, coords, sample_num, random_sample):
     :param sample_num:
     :param random_sample:
     :return:
+
+    Description
+        sampling evenly(randomly) between the depth range based on sample num
     """
     qn, rn, _ = coords.shape
     device = coords.device

@@ -42,11 +42,26 @@ def add_depth_offset(depth,mask,region_min,region_max,offset_min,offset_max,nois
     depth[masked_coords[:, 1], masked_coords[:, 0]] += local_offset
 
 def build_src_imgs_info_select(database, ref_ids, ref_ids_all, cost_volume_nn_num, pad_interval=-1):
+    """
+    Description
+        select nearest [cost_volume_nn_num] cameras in from ref_ids_all for each ref_id
+    Outputs:
+        ref_idx_exp
+        ref_imgs_info:
+            image
+            poses
+            Ks
+            depth range
+            masks
+        ref_cv_idx: absolute idx of references' source images
+        ref_real_idx: absolute idx of reference image
+    """
+
     # ref_ids - selected ref ids for rendering
-    ref_idx_exp = compute_nearest_camera_indices(database, ref_ids, ref_ids_all)
-    ref_idx_exp = ref_idx_exp[:, 1:1 + cost_volume_nn_num]
+    ref_idx_exp = compute_nearest_camera_indices(database, ref_ids, ref_ids_all) #junpeng: (len(ref_ids),len(ref_ids_all))
+    ref_idx_exp = ref_idx_exp[:, 1:1 + cost_volume_nn_num] #junpeng (len(ref_ids),cost_volume_nn_num)
     ref_ids_all = np.asarray(ref_ids_all)
-    ref_ids_exp = ref_ids_all[ref_idx_exp]  # rfn,nn
+    ref_ids_exp = ref_ids_all[ref_idx_exp]  # rfn,nn #the absolute ids in the database
     ref_ids_exp_ = ref_ids_exp.flatten()
     ref_ids = np.asarray(ref_ids)
     ref_ids_in = np.unique(np.concatenate([ref_ids_exp_, ref_ids]))  # rfn'

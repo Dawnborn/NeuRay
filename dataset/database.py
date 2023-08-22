@@ -262,27 +262,37 @@ class NeRFSyntheticDatabase(BaseDatabase):
         val_img_ids,val_poses,K = self.parse_info('val')
 
         self.K=K
-        self.img_ids=train_img_ids+val_img_ids+test_img_ids
+        self.img_ids=train_img_ids+val_img_ids+test_img_ids #junpeng: 1d list, ['val-r_0',...,'test-r_0',...,'train-r_0',...]
         self.poses=train_poses+val_poses+test_poses
         self.background=background
-        self.range_dict={img_id:np.asarray((2.0,6.0),np.float32) for img_id in self.img_ids}
+        self.range_dict={img_id:np.asarray((2.0,6.0),np.float32) for img_id in self.img_ids} #junpeng: hard-coded depth range dict for all images
         ratio = int(size) / 800
         self.K = np.diag([ratio,ratio,1.0]).astype(np.float32) @ K
-        self.depth_img_ids = [img_id for img_id in self.img_ids if self._depth_existence(img_id)]
+        self.depth_img_ids = [img_id for img_id in self.img_ids if self._depth_existence(img_id)] #junpeng: only those images with colmap depth gt
 
     def parse_info(self,split='train'):
+        """
+        Inputs:
+            split: train,val,test
+
+        Outputs:
+
+        Description:
+            label the data with "train" "val" and "test"
+
+        """
         with open(f'{self.root_dir}/transforms_{split}.json','r') as f:
             img_info=json.load(f)
             focal=float(img_info['camera_angle_x'])
             img_ids,poses=[],[]
             for frame in img_info['frames']:
                 img_ids.append('-'.join(frame['file_path'].split('/')[1:]))
-                pose=np.asarray(frame['transform_matrix'], np.float32)
+                pose=np.asarray(frame['transform_matrix'], np.float32) #junpeng: c2w RUB, right hand
                 R = pose[:3,:3].T
-                t = -R @ pose[:3,3:]
+                t = -R @ pose[:3,3:] #junpeng: w2c RUB, right hand
                 R = np.diag(np.asarray([1,-1,-1])) @ R
                 t = np.diag(np.asarray([1,-1,-1])) @ t
-                poses.append(np.concatenate([R,t],1))
+                poses.append(np.concatenate([R,t],1)) # now is left hand, LDF w2c
 
             h,w,_=imread(f'{self.root_dir}/{self.img_id2img_path(img_ids[0])}.png').shape
             focal = .5 * w / np.tan(.5 * focal)
@@ -1003,10 +1013,32 @@ def parse_database_name(database_name:str)->BaseDatabase:
         raise NotImplementedError
 
 def get_database_split(database: BaseDatabase, split_type='val'):
+    """
+    Inputs:
+        database: NeRFSyntheticDatabase
+        split_type: test, test_all, val
+
+    Outpus:
+        traind_ids: or reference ids
+        val_ids: or render ids
+
+    Description:
+        get the image ids for training (reference) and validation (rendering)
+        split_type:
+            *_all: include all images without checking the corresponding depth image exists
+            val:
+                train_ids: all image with depth gt;
+                val_ods: use hard-coded nerf_syn_val_ids
+            test:
+                train_ids: train-r_0...
+                val_ids: test-r_0...
+            example:
+                randomly shuffle to get certain part of train_ids and val_ids
+    """
     database_name = database.database_name
     if split_type.startswith('val'):
         splits = split_type.split('_')
-        depth_valid = not(len(splits)>1 and splits[1]=='all')
+        depth_valid = not(len(splits)>1 and splits[1]=='all') ### check the gt depth image: False: val_all
         if database_name.startswith('nerf_synthetic'):
             train_ids = [img_id for img_id in database.get_img_ids(check_depth_exist=depth_valid) if img_id.startswith('tr')]
             val_ids = nerf_syn_val_ids

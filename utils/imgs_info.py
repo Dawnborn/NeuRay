@@ -75,6 +75,17 @@ def pad_imgs_info(ref_imgs_info,pad_interval):
     return ref_imgs_info
 
 def build_imgs_info(database, ref_ids, pad_interval=-1, is_aligned=True, align_depth_range=False, has_depth=True, replace_none_depth = False):
+    """
+    Output:
+        ref_imgs_info:
+            image
+            poses
+            Ks
+            depth range
+            masks
+    Description:
+        #TODO
+    """
     if not is_aligned:
         assert has_depth
         rfn = len(ref_ids)
@@ -96,8 +107,8 @@ def build_imgs_info(database, ref_ids, pad_interval=-1, is_aligned=True, align_d
         ref_masks = np.stack(ref_masks, 0)[:, None, :, :]
         ref_depths = np.stack(ref_depths, 0)[:, None, :, :]
     else:
-        ref_imgs = color_map_forward(np.asarray([database.get_image(ref_id) for ref_id in ref_ids])).transpose([0, 3, 1, 2])
-        ref_masks =  np.asarray([database.get_mask(ref_id) for ref_id in ref_ids], dtype=np.float32)[:, None, :, :]
+        ref_imgs = color_map_forward(np.asarray([database.get_image(ref_id) for ref_id in ref_ids])).transpose([0, 3, 1, 2]) #junpeng: /255
+        ref_masks =  np.asarray([database.get_mask(ref_id) for ref_id in ref_ids], dtype=np.float32)[:, None, :, :] #junpeng: mask means alpha value
         if has_depth:
             ref_depths = [database.get_depth(ref_id) for ref_id in ref_ids]
             if replace_none_depth:
@@ -116,14 +127,23 @@ def build_imgs_info(database, ref_ids, pad_interval=-1, is_aligned=True, align_d
     ref_imgs_info = {'imgs': ref_imgs, 'poses': ref_poses, 'Ks': ref_Ks, 'depth_range': ref_depth_range, 'masks': ref_masks}
     if has_depth: ref_imgs_info['depth'] = ref_depths
     if pad_interval!=-1:
-        ref_imgs_info = pad_imgs_info(ref_imgs_info, pad_interval)
+        ref_imgs_info = pad_imgs_info(ref_imgs_info, pad_interval) #
     return ref_imgs_info
 
 def build_render_imgs_info(que_pose,que_K,que_shape,que_depth_range):
+    """
+    Description:
+        change the format of poses,
+    Output:
+        Ks
+        coords: 2D coordinates to be rendered (1, h*w, 2）
+        depth_range：
+        shape：
+    """
     h, w = que_shape
     h, w = int(h), int(w)
-    que_coords = np.stack(np.meshgrid(np.arange(w), np.arange(h)), -1)
-    que_coords = que_coords.reshape([1, -1, 2]).astype(np.float32)
+    que_coords = np.stack(np.meshgrid(np.arange(w), np.arange(h)), -1) #junpeng: h,w,2
+    que_coords = que_coords.reshape([1, -1, 2]).astype(np.float32) #junpeng: 1, h*w, 2
     return {'poses': que_pose.astype(np.float32)[None,:,:],  # 1,3,4
             'Ks': que_K.astype(np.float32)[None,:,:],  # 1,3,3
             'coords': que_coords,

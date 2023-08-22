@@ -16,9 +16,33 @@ from utils.render_poses import get_render_poses
 from utils.view_select import select_working_views_db
 
 def prepare_render_info(database, pose_type, pose_fn, use_depth):
+    """
+    Inputs:
+        database: [NeRFSyntheticDatabase]
+        pose_type: [eval, inter, circle], type of render poses.
+        pose_fn: file to render poses, None by default
+        use_depth: True or False, if set true, only those images with depth ground truth will be loaded
+
+    Outputs:
+        que_poses: poses to be rendered
+        que_Ks: intrinsics to be rendered
+        que_shapes: shape of images to be rendered
+        que_depth_ranges: depth range, got from the database
+        ref_ids:
+        render_ids: ids of the image to be rendered in the database, can be used for database.get_**(render_id)
+
+    Description:
+        Generate render ids and reference ids (and their corresponding intrinsics and poses) from the database.
+        pose_type eval:
+            use get_database_split to create reference ids and render ids for evaluation
+        pose_type cases
+            (just rendering for simple visualization, not for evaluation):
+            inter: interpolation
+            circle: generating viewpoints surrounding the object
+    """
     # interpolate poses
     if pose_type.startswith('eval'):
-        split_name = 'test' if use_depth else 'test_all'
+        split_name = 'test' if use_depth else 'test_all' #junpeng: test all means include those without depth gt
         ref_ids, render_ids = get_database_split(database, split_name)
         que_Ks = np.asarray([database.get_K(render_id) for render_id in render_ids],np.float32)
         que_poses = np.asarray([database.get_pose(render_id) for render_id in render_ids],np.float32)
@@ -70,6 +94,15 @@ def render_video_gen(database_name: str,
                      pose_type='inter', pose_fn=None,
                      render_depth=False,
                      ray_num=8192, rb=0, re=-1):
+    """
+    database_name: [NeRFSyntheticDatabase]
+    pose_type: type of render poses, [eval, inter, circle]
+    pose_fn: file to render poses, None by default
+    render_depth: output depth image or not
+    ray_num: number of rays in one rendering batch
+    rb: begin index of rendering poses
+    re: end index of rendering poses
+    """
     default_render_cfg = {
         'min_wn': 8, # working view number
         'ref_pad_interval': 16, # input image size should be multiple of 16
@@ -87,7 +120,7 @@ def render_video_gen(database_name: str,
 
     cfg['render_depth'] = render_depth
     # load model
-    renderer = name2network[cfg['network']](cfg)
+    renderer = name2network[cfg['network']](cfg) #junpeng: neuray_gen
     ckpt = torch.load(f'data/model/{cfg["name"]}/model_best.pth')
     renderer.load_state_dict(ckpt['network_state_dict'])
     renderer.cuda()
@@ -195,20 +228,20 @@ def render_video_ft(database_name, cfg_fn, pose_type, pose_fn, render_depth=Fals
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--database_name', type=str, default='llff_colmap/fern/high', help='<dataset_name>/<scene_name>/<scene_setting>')
-    parser.add_argument('--cfg', type=str, default='configs/gen_lr_neuray.yaml', help='config path of the renderer')
-    parser.add_argument('--pose_type', type=str, default='eval', help='type of render poses')
+    parser.add_argument('--database_name', type=str, default='nerf_synthetic/lego/black_800', help='<dataset_name>/<scene_name>/<scene_setting>')
+    parser.add_argument('--cfg', type=str, default='configs/gen/neuray_gen_cost_volume.yaml', help='config path of the renderer')
+    parser.add_argument('--pose_type', type=str, default='eval', help='type of render poses. _all means those without depth gt are also considered')
     parser.add_argument('--pose_fn', type=str, default=None, help='file to render poses')
     parser.add_argument('--rb', type=int, default=0, help='begin index of rendering poses')
     parser.add_argument('--re', type=int, default=-1, help='end index of rendering poses')
     parser.add_argument('--render_type', type=str, default='gen', help='gen:generalization or ft:finetuning')
     parser.add_argument('--ray_num', type=int, default=4096, help='number of rays in one rendering batch')
-    parser.add_argument('--depth', action='store_true', dest='depth', default=False)
+    parser.add_argument('--depth', action='store_true', dest='depth', default=False, help='render depth image or not')
     # parser.add_argument('--overlap', action='store_true', dest='overlap', default=False)
     flags = parser.parse_args()
     if flags.render_type=='gen':
         render_video_gen(flags.database_name, cfg_fn=flags.cfg, pose_type=flags.pose_type, pose_fn=flags.pose_fn,
-                         render_depth=flags.depth, ray_num=flags.ray_num, rb=flags.rb,re=flags.re)
+                         render_depth=flags.depth, ray_num=flags.ray_num, rb=flags.rb, re=flags.re)
     else:
         render_video_ft(flags.database_name, cfg_fn=flags.cfg, pose_type=flags.pose_type, pose_fn=flags.pose_fn,
                         render_depth=flags.depth, ray_num=flags.ray_num, rb=flags.rb, re=flags.re)
