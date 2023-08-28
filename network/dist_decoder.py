@@ -12,6 +12,9 @@ def get_near_far_points(depth, interval, depth_range, is_ref, fixed_interval=Fal
     :param fixed_interval:
     :param fixed_interval_val:
     :return: near far [rfn,qn,rn,dn] or [qn,rn,dn]
+
+    Description:
+        get the depth range and depth of the projected points and inverse them
     """
     if is_ref:
         ref_near = depth_range[:, 0]
@@ -97,9 +100,14 @@ class MixtureLogisticsDistDecoder(nn.Module):
             )
 
     def forward(self, feats):
-        prj_mean = self.mean_decoder(feats)
-        prj_var = self.var_decoder(feats)
-        prj_aw = self.aw_decoder(feats)
+        """
+        feats: view number, query number, ray number, sample point number, feature dimension
+        Outputs:
+
+        """
+        prj_mean = self.mean_decoder(feats) #junpeng: view number, query number, ray number, sample point number, 2
+        prj_var = self.var_decoder(feats) #junpeng: view number, query number, ray number, sample point number, 2
+        prj_aw = self.aw_decoder(feats) #junpeng: view number, query number, ray number, sample point number, 1
         if self.cfg['use_vis']:
             prj_vis = self.vis_decoder(feats)
         else:

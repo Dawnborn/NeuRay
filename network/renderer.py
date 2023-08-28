@@ -1,3 +1,4 @@
+import pdb
 import time
 from pathlib import Path
 
@@ -65,12 +66,16 @@ class NeuralRayBaseRenderer(nn.Module):
         self.sph_fitter = SphericalHarmonicsSolver(3)
 
     def predict_proj_ray_prob(self, prj_dict, ref_imgs_info, que_dists, is_fine):
-        rfn, qn, rn, dn, _ = prj_dict['mask'].shape
+        """
+        Description:
+            add on alpha, vis, and hit_prob
+        """
+        rfn, qn, rn, dn, _ = prj_dict['mask'].shape #junpeng: view number, query number, ray number, sample point number
         # decode ray prob
         if is_fine:
             prj_mean, prj_var, prj_vis, prj_aw = self.fine_dist_decoder(prj_dict['ray_feats'])
         else:
-            prj_mean, prj_var, prj_vis, prj_aw = self.dist_decoder(prj_dict['ray_feats'])
+            prj_mean, prj_var, prj_vis, prj_aw = self.dist_decoder(prj_dict['ray_feats']) #junpeng MixtureLogisticsDisDecoder(view number, query number, ray number, sample point number, feature dimension)
 
         alpha_values, visibility, hit_prob = self.dist_decoder.compute_prob(
             prj_dict['depth'].squeeze(-1),que_dists.unsqueeze(0),prj_mean,prj_var,
@@ -158,16 +163,19 @@ class NeuralRayBaseRenderer(nn.Module):
         if is_fine:
             density, colors = self.fine_agg_net(prj_dict, que_dir)
         else:
-            density, colors = self.agg_net(prj_dict, que_dir)
+            density, colors = self.agg_net(prj_dict, que_dir) #junpeng: DefaultAggregationNet (working view, ray number, sample number)
 
-        alpha_values = 1.0 - torch.exp(-torch.relu(density))
-        hit_prob = alpha_values2hit_prob(alpha_values)
-        pixel_colors = torch.sum(hit_prob.unsqueeze(-1)*colors,2)
+        alpha_values = 1.0 - torch.exp(-torch.relu(density)) #junpeng: (working view, ray number, sample number)
+        hit_prob = alpha_values2hit_prob(alpha_values) #junpeng: (working view, ray number, sample number)
+        pixel_colors = torch.sum(hit_prob.unsqueeze(-1)*colors,2) #junpeng: (working view, ray number, 3)
         return hit_prob, colors, pixel_colors
 
     def render_by_depth(self, que_depth, que_imgs_info, ref_imgs_info, is_train, is_fine):
         """
-
+        Description:
+            render depth
+        Outputs:
+            []
         """
         ref_imgs_info = ref_imgs_info.copy()
         que_imgs_info = que_imgs_info.copy()
@@ -220,7 +228,10 @@ class NeuralRayBaseRenderer(nn.Module):
     def render_impl(self, que_imgs_info, ref_imgs_info, is_train):
         # [qn,rn,dn]
         """
-        #TODO: breakpoint from last time
+        Description:
+            #TODO description
+        Output:
+
         """
         que_depth, _ = sample_depth(que_imgs_info['depth_range'], que_imgs_info['coords'], self.cfg['depth_sample_num'], False)
         outputs = self.render_by_depth(que_depth, que_imgs_info, ref_imgs_info, is_train, False)
@@ -232,7 +243,7 @@ class NeuralRayBaseRenderer(nn.Module):
         return outputs
 
     def render(self, que_imgs_info, ref_imgs_info, is_train):
-        ref_img_feats = self.image_encoder(ref_imgs_info['imgs'])
+        ref_img_feats = self.image_encoder(ref_imgs_info['imgs']) #junpeng: 8,32,200,200 (ref number, channels, h, w)
         ref_imgs_info['img_feats'] = ref_img_feats #junpeng: 8， 32， 200， 200
         ref_imgs_info['ray_feats'] = self.vis_encoder(ref_imgs_info['ray_feats'], ref_img_feats) #junpeng: 8,32,200,200
 
@@ -241,10 +252,11 @@ class NeuralRayBaseRenderer(nn.Module):
             que_imgs_info['ray_feats'] = self.vis_encoder(que_imgs_info['ray_feats'], que_img_feats)
 
         ray_batch_num = self.cfg["ray_batch_num"] #junpeng: batch of rays processed at the same time: 4096
-        coords = que_imgs_info['coords']
-        ray_num = coords.shape[1] #junepng: raynum in all
+        coords = que_imgs_info['coords'] # 2D
+        ray_num = coords.shape[1] #junepng: ray num in all
         render_info_all = {}
         for ray_id in range(0,ray_num,ray_batch_num):
+            #junpeng: iterate over the ray one by one (batch by batch),
             que_imgs_info['coords']=coords[:,ray_id:ray_id+ray_batch_num]
             render_info = self.render_impl(que_imgs_info,ref_imgs_info,is_train)
             output_keys = [k for k in render_info.keys() if is_train or (not k.startswith('hit_prob'))]
@@ -272,7 +284,7 @@ class NeuralRayGenRenderer(NeuralRayBaseRenderer):
         self.init_net=name2init_net[self.cfg['init_net_type']](self.cfg['init_net_cfg']) #junpeng: cost_volume：CostVolumeInitNet
 
     def render_call(self, que_imgs_info, ref_imgs_info, is_train, src_imgs_info=None):
-        ref_imgs_info['ray_feats'] = self.init_net(ref_imgs_info, src_imgs_info, is_train) #junpeng: (8,32,200,200) TODO: why 32?
+        ref_imgs_info['ray_feats'] = self.init_net(ref_imgs_info, src_imgs_info, is_train) #junpeng: (8,32,200,200) (reference number, C, h, w)
         return self.render(que_imgs_info, ref_imgs_info, is_train)
 
     def gen_depth_loss_coords(self,h,w,device):

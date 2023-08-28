@@ -61,7 +61,7 @@ def build_src_imgs_info_select(database, ref_ids, ref_ids_all, cost_volume_nn_nu
     ref_idx_exp = compute_nearest_camera_indices(database, ref_ids, ref_ids_all) #junpeng: (len(ref_ids),len(ref_ids_all))
     ref_idx_exp = ref_idx_exp[:, 1:1 + cost_volume_nn_num] #junpeng (len(ref_ids),cost_volume_nn_num)
     ref_ids_all = np.asarray(ref_ids_all)
-    ref_ids_exp = ref_ids_all[ref_idx_exp]  # rfn,nn #the absolute ids in the database
+    ref_ids_exp = ref_ids_all[ref_idx_exp]  # rfn,nn #junpeng the absolute ids in the database
     ref_ids_exp_ = ref_ids_exp.flatten()
     ref_ids = np.asarray(ref_ids)
     ref_ids_in = np.unique(np.concatenate([ref_ids_exp_, ref_ids]))  # rfn'

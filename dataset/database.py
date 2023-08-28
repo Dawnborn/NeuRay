@@ -292,7 +292,7 @@ class NeRFSyntheticDatabase(BaseDatabase):
                 t = -R @ pose[:3,3:] #junpeng: w2c RUB, right hand
                 R = np.diag(np.asarray([1,-1,-1])) @ R
                 t = np.diag(np.asarray([1,-1,-1])) @ t
-                poses.append(np.concatenate([R,t],1)) # now is left hand, LDF w2c
+                poses.append(np.concatenate([R,t],1)) #junpeng: now: LDF w2c, left-handed
 
             h,w,_=imread(f'{self.root_dir}/{self.img_id2img_path(img_ids[0])}.png').shape
             focal = .5 * w / np.tan(.5 * focal)

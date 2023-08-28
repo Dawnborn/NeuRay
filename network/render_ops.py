@@ -1,49 +1,63 @@
 import torch
 from network.ops import interpolate_feats
 
-def coords2rays(coords, poses, Ks):
+def  coords2rays(coords, poses, Ks):
     """
-    :param coords:   [rfn,rn,2]
-    :param poses:    [rfn,3,4]
+    :param coords:   [rfn,rn,2] #junpeng: reference view number, ray number, 2
+    :param poses:    [rfn,3,4] #junpeng: reference view number,
     :param Ks:       [rfn,3,3]
     :return:
         ref_rays:
             centers:    [rfn,rn,3]
             directions: [rfn,rn,3]
+
+    Description:
+
     """
-    rot = poses[:, :, :3].unsqueeze(1).permute(0, 1, 3, 2)  # rfn,1,3,3
-    trans = -rot @ poses[:, :, 3:].unsqueeze(1)  # rfn,1,3,1
+    rot = poses[:, :, :3].unsqueeze(1).permute(0, 1, 3, 2)  # rfn,1,3,3 #junpeng: read in w2c, after permutation is c2w
+    trans = -rot @ poses[:, :, 3:].unsqueeze(1)  # rfn,1,3,1 #junpeng: translation c2w
 
     rfn, rn, _ = coords.shape
     centers = trans.repeat(1, rn, 1, 1).squeeze(-1)  # rfn,rn,3
     coords = torch.cat([coords, torch.ones([rfn, rn, 1], dtype=torch.float32, device=coords.device)], 2)  # rfn,rn,3
     Ks_inv = torch.inverse(Ks).unsqueeze(1)
-    cam_xyz = Ks_inv @ coords.unsqueeze(3)
-    cam_xyz = rot @ cam_xyz + trans
-    directions = cam_xyz.squeeze(3) - centers
+    cam_xyz = Ks_inv @ coords.unsqueeze(3) #junpeng: normalized plane
+    cam_xyz = rot @ cam_xyz + trans #junpeng: world frame
+    directions = cam_xyz.squeeze(3) - centers #junpeng: world frame
     # directions = directions / torch.clamp(torch.norm(directions, dim=2, keepdim=True), min=1e-4)
     return centers, directions
 
 def depth2points(que_imgs_info, que_depth):
     """
-    :param que_imgs_info:
-    :param que_depth:       qn,rn,dn
-    :return:
+    Description:
+        project coords back to 3d position under world frame
+    Inputs:
+        :param que_imgs_info:
+        :param que_depth:       qn,rn,dn
+    Returns
+
     """
-    cneters, directions = coords2rays(que_imgs_info['coords'],que_imgs_info['poses'],que_imgs_info['Ks']) # centers, directions qn,rn,3
-    qn, rn, _ = cneters.shape
-    que_pts = cneters.unsqueeze(2) + directions.unsqueeze(2) * que_depth.unsqueeze(3) # qn,rn,dn,3
+    centers, directions = coords2rays(que_imgs_info['coords'],que_imgs_info['poses'],que_imgs_info['Ks']) # centers, directions qn,rn,3
+    qn, rn, _ = centers.shape
+    que_pts = centers.unsqueeze(2) + directions.unsqueeze(2) * que_depth.unsqueeze(3) # qn,rn,dn,3
     qn, rn, dn, _ = que_pts.shape
     que_dir = -directions / torch.norm(directions, dim=2, keepdim=True)  # qn,rn,3
     que_dir = que_dir.unsqueeze(2).repeat(1, 1, dn, 1)
     return que_pts, que_dir # qn,rn,dn,3
 
 def depth2dists(depth):
+    """
+    Description:
+        return the distance between each sampled points
+    """
     device = depth.device
     dists = depth[...,1:]-depth[...,:-1]
     return torch.cat([dists, torch.full([*depth.shape[:-1], 1], 1e6, dtype=torch.float32, device=device)], -1)
 
 def depth2inv_dists(depth,depth_range):
+    """
+    inverse the original depth value
+    """
     near, far = -1 / depth_range[:, 0], -1 / depth_range[:, 1]
     near, far = near[:, None, None], far[:, None, None]
     depth_inv = -1 / depth  # qn,rn,dn
@@ -53,7 +67,7 @@ def depth2inv_dists(depth,depth_range):
 
 def interpolate_feature_map(ray_feats, coords, mask, h, w, border_type='border'):
     """
-    :param ray_feats:       rfn,f,h,w
+    :param ray_feats:       rfn,f,h,w #junpeng: features from the init model
     :param coords:          rfn,pn,2
     :param mask:            rfn,pn
     :param h:
@@ -73,6 +87,7 @@ def alpha_values2hit_prob(alpha_values):
     """
     :param alpha_values: qn,rn,dn
     :return: qn,rn,dn
+    convert alpha values to hit probability
     """
     no_hit_density = torch.cat([torch.ones((*alpha_values.shape[:-1], 1))
                                .to(alpha_values.device), 1. - alpha_values + 1e-10], -1)  # rn,k+1
@@ -108,8 +123,11 @@ def project_points_directions(poses,points):
     :param poses:       rfn,3,4
     :param points:      pn,3
     :return: rfn,pn,3
+
+    Description:
+        return directions of camera to points under world frame
     """
-    cam_pts = -poses[:, :, :3].permute(0, 2, 1) @ poses[:, :, 3:]  # rfn,3,1
+    cam_pts = -poses[:, :, :3].permute(0, 2, 1) @ poses[:, :, 3:]  # rfn,3,1 #junpeng: camera under world frame
     dir = points.unsqueeze(0) - cam_pts.permute(0, 2, 1)  # [1,pn,3] - [rfn,1,3] -> rfn,pn,3
     dir = -dir / torch.clamp_min(torch.norm(dir, dim=2, keepdim=True), min=1e-5)  # rfn,pn,3
     return dir
@@ -117,7 +135,7 @@ def project_points_directions(poses,points):
 def project_points_ref_views(ref_imgs_info, que_points):
     """
     :param ref_imgs_info:
-    :param que_points:      pn,3
+    :param que_points:      pn,3 #junpeng: under world frame
     :return:
     """
     prj_pts, prj_valid_mask, prj_depth = project_points_coords(
@@ -130,6 +148,18 @@ def project_points_ref_views(ref_imgs_info, que_points):
     return prj_dir, prj_pts, prj_depth, valid_mask
 
 def project_points_dict(ref_imgs_info, que_pts):
+    """
+    project points to ref images and interpolate
+    prj_dict:
+        dir: ref camera to projected points
+        pts: projected points
+        depth: projected depth on the reference camera (not inversed)
+        mask: valid projection (inside the (h,w) boundary)
+        ray_features: ray_features of projected points, (interpolated)
+        rgb:
+
+    #TODO: can be replaced by MipNerf or bevformer style "projection"
+    """
     # project all points
     qn, rn, dn, _ = que_pts.shape
     prj_dir, prj_pts, prj_depth, prj_mask = project_points_ref_views(ref_imgs_info, que_pts.reshape([qn * rn * dn, 3]))
@@ -148,10 +178,12 @@ def sample_depth(depth_range, coords, sample_num, random_sample):
     :param depth_range: qn,2
     :param sample_num:
     :param random_sample:
-    :return:
 
     Description
-        sampling evenly(randomly) between the depth range based on sample num
+        sampling evenly or (randomly) between the depth range based on sample num
+    Outputs:
+        que_depth
+        que_dists
     """
     qn, rn, _ = coords.shape
     device = coords.device

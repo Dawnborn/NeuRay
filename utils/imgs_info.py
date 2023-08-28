@@ -58,6 +58,10 @@ def random_flip(ref_imgs_info,que_imgs_info):
     return ref_imgs_info, que_imgs_info
 
 def pad_imgs_info(ref_imgs_info,pad_interval):
+    '''
+    Description:
+        pad the image with
+    '''
     ref_imgs, ref_depths, ref_masks = ref_imgs_info['imgs'], ref_imgs_info['depth'], ref_imgs_info['masks']
     ref_depth_gt = ref_imgs_info['true_depth'] if 'true_depth' in ref_imgs_info else None
     rfn, _, h, w = ref_imgs.shape
@@ -84,7 +88,7 @@ def build_imgs_info(database, ref_ids, pad_interval=-1, is_aligned=True, align_d
             depth range
             masks
     Description:
-        #TODO
+        generate ref_imgs_info as aboved
     """
     if not is_aligned:
         assert has_depth

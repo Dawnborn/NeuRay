@@ -21,12 +21,18 @@ def compute_nearest_camera_indices(database, que_ids, ref_ids=None):
 
 def select_working_views(ref_poses, que_poses, work_num, exclude_self=False):
     """
+    Input:
+        ref_poses (Numbder of reference poses,3,4)
+        que_poses (Number of query poses,3,5)
     Description:
         exclude those que_poses (to be rendered)
+        calculate the distance between the ref poses and render poses
+        select work_num (translation) closest ref_poses for each que_poese,
+        exclude
     """
-    ref_cam_pts = np.asarray([-pose[:, :3].T @ pose[:, 3] for pose in ref_poses])
-    render_cam_pts = np.asarray([-pose[:, :3].T @ pose[:, 3] for pose in que_poses])
-    dists = np.linalg.norm(ref_cam_pts[None, :, :] - render_cam_pts[:, None, :], 2, 2) # qn,rfn #TODO: what distance?
+    ref_cam_pts = np.asarray([-pose[:, :3].T @ pose[:, 3] for pose in ref_poses]) # load in w2c, change it to c2w
+    render_cam_pts = np.asarray([-pose[:, :3].T @ pose[:, 3] for pose in que_poses]) # load in w2c, change it to c2w
+    dists = np.linalg.norm(ref_cam_pts[None, :, :] - render_cam_pts[:, None, :], 2, 2) # distance between ref_poses and src_poses under world frame
     ids = np.argsort(dists)
     if exclude_self:
         ids = ids[:, 1:work_num+1]
