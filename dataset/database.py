@@ -20,11 +20,18 @@ from PIL import Image
 from utils.llff_utils import load_llff_data
 from utils.real_estate_utils import parse_pose_file, unnormalize_intrinsics
 from utils.space_dataset_utils import ReadScene
+from utils.depth_utils import readEXR
 
 
 class BaseDatabase(abc.ABC):
-    def __init__(self, database_name):
+    def __init__(self, database_name, depth_format="colmap", depth_range=[2.0,6.0]):
         self.database_name = database_name
+        self.depth_range = depth_range
+        self.depth_format = depth_format
+        self.depth_formats = ["colmap","blender"] # supported depth formats
+        if not depth_format in self.depth_formats:
+            print("Depth formats not supported!!!")
+            raise NotImplementedError
 
     @abc.abstractmethod
     def get_image(self, img_id):
@@ -249,8 +256,8 @@ class DTUTestDatabase(BaseDatabase):
         return self.depth_range.copy()
 
 class NeRFSyntheticDatabase(BaseDatabase):
-    def __init__(self, database_name):
-        super().__init__(database_name)
+    def __init__(self, database_name, depth_format="colmap", depth_range=[0.2,0.6]):
+        super().__init__(database_name, depth_format, depth_range)
         _, model_name, background_size = database_name.split('/')
         background, size = background_size.split('_')
         self.model_name = model_name
@@ -265,7 +272,7 @@ class NeRFSyntheticDatabase(BaseDatabase):
         self.img_ids=train_img_ids+val_img_ids+test_img_ids #junpeng: 1d list, ['val-r_0',...,'test-r_0',...,'train-r_0',...]
         self.poses=train_poses+val_poses+test_poses
         self.background=background
-        self.range_dict={img_id:np.asarray((2.0,6.0),np.float32) for img_id in self.img_ids} #junpeng: hard-coded depth range dict for all images
+        self.range_dict={img_id:np.asarray(self.depth_range,np.float32) for img_id in self.img_ids} #TODO: hard-coded depth range dict for all images, changed to 0.4-1.2 for our dataset
         ratio = int(size) / 800
         self.K = np.diag([ratio,ratio,1.0]).astype(np.float32) @ K
         self.depth_img_ids = [img_id for img_id in self.img_ids if self._depth_existence(img_id)] #junpeng: only those images with colmap depth gt
@@ -340,18 +347,33 @@ class NeRFSyntheticDatabase(BaseDatabase):
         return [x_min,y_min,x_max-x_min+1,y_max-y_min+1]
 
     def _depth_existence(self,img_id):
-        fn=f'{self.root_dir}/colmap_depth/{img_id}.png.geometric.bin'
+        if self.depth_format=="colmap":
+            fn=f'{self.root_dir}/colmap_depth/{img_id}.png.geometric.bin'
+        elif self.depth_format=="blender":
+            fn = f'{self.root_dir}/{self.img_id2img_path(img_id)}_depth_0001.exr'
+        else:
+            raise NotImplementedError
         return os.path.exists(fn)
 
     def get_depth(self, img_id):
-        fn=f'{self.root_dir}/colmap_depth/{img_id}.png.geometric.bin'
-        if os.path.exists(fn):
-            depth = read_array(fn)
+        if self.depth_format=="colmap":
+            fn=f'{self.root_dir}/colmap_depth/{img_id}.png.geometric.bin'
+            if os.path.exists(fn):
+                depth = read_array(fn)
+                if self.img_size!=800:
+                    depth = cv2.resize(depth, (self.img_size,self.img_size), interpolation=cv2.INTER_NEAREST)
+                return depth
+            else:
+                return None
+        elif self.depth_format=="blender":
+            fn_exr = f'{self.root_dir}/{self.img_id2img_path(img_id)}_depth_0001.exr'
+            depth, z = readEXR(fn_exr)
+            depth = depth[:,:,0]
             if self.img_size!=800:
-                depth = cv2.resize(depth, (self.img_size,self.img_size), interpolation=cv2.INTER_NEAREST)
+                    depth = cv2.resize(depth, (self.img_size,self.img_size), interpolation=cv2.INTER_NEAREST)
             return depth
         else:
-            return None
+            raise NotImplementedError
 
     def get_mask(self, img_id):
         alpha=imread(f'{self.root_dir}/{self.img_id2img_path(img_id)}.png')[:,:,3]
@@ -990,7 +1012,7 @@ class DTUTrainDatabase(BaseDatabase):
         return self.range_dict[img_id].copy()
 
 
-def parse_database_name(database_name:str)->BaseDatabase:
+def parse_database_name(database_name:str, depth_format="colmap", depth_range=[2.0, 6.0])->BaseDatabase:
     name2database={
         # training database
         'gso': GoogleScannedObjectDatabase,
@@ -1008,7 +1030,7 @@ def parse_database_name(database_name:str)->BaseDatabase:
     }
     database_type = database_name.split('/')[0]
     if database_type in name2database:
-        return name2database[database_type](database_name)
+        return name2database[database_type](database_name, depth_format, depth_range)
     else:
         raise NotImplementedError
 

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+import OpenEXR as exr  # OpenEXR should be here imported first, or the environment variables might be changed (by pytorch) later
 import torch
 from skimage.io import imsave
 from tqdm import tqdm
@@ -93,7 +94,7 @@ def render_video_gen(database_name: str,
                      cfg_fn='configs/gen_lr_neuray.yaml',
                      pose_type='inter', pose_fn=None,
                      render_depth=False,
-                     ray_num=8192, rb=0, re=-1):
+                     ray_num=8192, rb=0, re=-1, depth_format="colmap", depth_range=[2.0, 6.0]):
     """
     database_name: [NeRFSyntheticDatabase]
     pose_type: type of render poses, [eval, inter, circle]
@@ -102,6 +103,8 @@ def render_video_gen(database_name: str,
     ray_num: number of rays in one rendering batch
     rb: begin index of rendering poses
     re: end index of rendering poses
+    depth_format: [colmap, blender]
+    depth_range: [2.0,6.0] by default
     """
     default_render_cfg = {
         'min_wn': 8, # working view number
@@ -128,7 +131,7 @@ def render_video_gen(database_name: str,
     step = ckpt["step"]
 
     # render poses
-    database = parse_database_name(database_name)
+    database = parse_database_name(database_name,depth_range=depth_range, depth_format=depth_format)
     que_poses, que_Ks, que_shapes, que_depth_ranges, ref_ids_all, render_ids = \
         prepare_render_info(database, pose_type, pose_fn, render_cfg['use_depth'])
 
@@ -228,20 +231,22 @@ def render_video_ft(database_name, cfg_fn, pose_type, pose_fn, render_depth=Fals
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--database_name', type=str, default='nerf_synthetic/lego/black_800', help='<dataset_name>/<scene_name>/<scene_setting>')
-    parser.add_argument('--cfg', type=str, default='configs/gen/neuray_gen_cost_volume.yaml', help='config path of the renderer')
+    parser.add_argument('--database_name', type=str, default='nerf_synthetic/glass/black_800', help='<dataset_name>/<scene_name>/<scene_setting>')
+    parser.add_argument('--cfg', type=str, default='configs/gen/neuray_gen_depth.yaml', help='config path of the renderer')
     parser.add_argument('--pose_type', type=str, default='eval', help='type of render poses. _all means those without depth gt are also considered')
     parser.add_argument('--pose_fn', type=str, default=None, help='file to render poses')
     parser.add_argument('--rb', type=int, default=0, help='begin index of rendering poses')
     parser.add_argument('--re', type=int, default=-1, help='end index of rendering poses')
     parser.add_argument('--render_type', type=str, default='gen', help='gen:generalization or ft:finetuning')
-    parser.add_argument('--ray_num', type=int, default=4096, help='number of rays in one rendering batch')
-    parser.add_argument('--depth', action='store_true', dest='depth', default=False, help='render depth image or not')
+    parser.add_argument('--ray_num', type=int, default=12288, help='number of rays in one rendering batch')
+    parser.add_argument('--depth', action='store_true', dest='depth', default=True, help='render depth image or not')
+    parser.add_argument('--depth_format',type=str, default='blender', help='depth image format')
+    parser.add_argument('--depth_range', type=str, default=[0.4, 1.2])
     # parser.add_argument('--overlap', action='store_true', dest='overlap', default=False)
     flags = parser.parse_args()
     if flags.render_type=='gen':
         render_video_gen(flags.database_name, cfg_fn=flags.cfg, pose_type=flags.pose_type, pose_fn=flags.pose_fn,
-                         render_depth=flags.depth, ray_num=flags.ray_num, rb=flags.rb, re=flags.re)
+                         render_depth=flags.depth, ray_num=flags.ray_num, rb=flags.rb, re=flags.re, depth_format=flags.depth_format, depth_range=flags.depth_range)
     else:
         render_video_ft(flags.database_name, cfg_fn=flags.cfg, pose_type=flags.pose_type, pose_fn=flags.pose_fn,
                         render_depth=flags.depth, ray_num=flags.ray_num, rb=flags.rb, re=flags.re)
