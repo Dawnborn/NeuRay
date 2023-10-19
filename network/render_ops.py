@@ -137,6 +137,10 @@ def project_points_ref_views(ref_imgs_info, que_points):
     :param ref_imgs_info:
     :param que_points:      pn,3 #junpeng: under world frame
     :return:
+        projected_directions: directions of camera to points under world frame
+        projected valid mask: 
+        projected_points: [[0-w],[0,h]]
+
     """
     prj_pts, prj_valid_mask, prj_depth = project_points_coords(
         que_points, ref_imgs_info['poses'], ref_imgs_info['Ks']) # rfn,pn,2
